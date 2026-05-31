@@ -1,0 +1,10 @@
+/* Microsoft uses Segoe UI which ships with Windows/Edge. We provide a web fallback. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+body, html, #root {
+  font-family: 'Segoe UI', 'Segoe UI Web (West European)', -apple-system, BlinkMacSystemFont, 'Inter', Roboto, 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #F3F2F1;
+  color: #201F1E;
+}
