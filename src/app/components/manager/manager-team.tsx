@@ -15,6 +15,7 @@ import {
   DialogActions,
   Textarea,
   Label,
+  Spinner,
 } from "@fluentui/react-components";
 import {
   CheckmarkCircleRegular,
@@ -33,7 +34,8 @@ import {
   type Task,
   type TaskPriority,
 } from "../../data/mock-data";
-import { getPersistedTasks, persistTask } from "../../hooks/useLocalStorage";
+import { persistTask } from "../../hooks/useLocalStorage";
+import { useTasksSync } from "../../hooks/useTasksSync";
 
 const priorityBadge = (p: TaskPriority): "danger" | "warning" | "important" | "informative" => {
   const m = { urgente: "danger", alta: "warning", media: "important", baja: "informative" } as const;
@@ -77,14 +79,14 @@ const useStyles = makeStyles({
   advisorCard: {
     width: "100%",
     backgroundColor: tokens.colorNeutralBackground2,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    ...shorthands.border("1px", "solid", tokens.colorBrandStroke1), // cambiado a colorBrandStroke1
     borderRadius: "12px",
     padding: "20px",
     cursor: "pointer",
     textAlign: "left",
     transition: "all 0.2s ease",
     ":hover": {
-      borderColor: tokens.colorBrandStroke2,
+      ...shorthands.borderColor(tokens.colorBrandStroke2),
       boxShadow: `0 4px 16px ${tokens.colorBrandShadowAmbient}`,
     },
   },
@@ -181,7 +183,7 @@ const useStyles = makeStyles({
     padding: "16px",
   },
   overdueTask: {
-    borderColor: tokens.colorStatusDangerBorder1,
+    ...shorthands.borderColor(tokens.colorStatusDangerBorder1),
   },
   taskContent: {
     display: "flex",
@@ -231,6 +233,12 @@ const useStyles = makeStyles({
     fontSize: "11px",
     marginTop: "4px",
   },
+  spinnerContainer: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: "40px",
+  },
 });
 
 export function ManagerTeam() {
@@ -240,14 +248,14 @@ export function ManagerTeam() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [newPriority, setNewPriority] = useState<TaskPriority>("media");
   const [priorityNote, setPriorityNote] = useState("");
+  const { tasks: syncedTasks, loading } = useTasksSync();
 
   useEffect(() => {
     if (selectedAdvisor) {
-      const persistedTasks = getPersistedTasks();
       const advTasks = tasks
         .filter((t) => t.asesorAsignado === selectedAdvisor)
         .map((task) => {
-          const persisted = persistedTasks.find((pt) => pt.id === task.id);
+          const persisted = syncedTasks.find((pt) => pt.id === task.id);
           if (persisted) {
             return { ...task, estado: persisted.estado as Task["estado"], prioridad: persisted.prioridad || task.prioridad };
           }
@@ -255,14 +263,13 @@ export function ManagerTeam() {
         });
       setAdvisorTasks(advTasks);
     }
-  }, [selectedAdvisor]);
+  }, [selectedAdvisor, syncedTasks]);
 
   const advisorStats = advisors.map((adv) => {
-    const persistedTasks = getPersistedTasks();
     const advTasks = tasks
       .filter((t) => t.asesorAsignado === adv.id)
       .map((task) => {
-        const persisted = persistedTasks.find((pt) => pt.id === task.id);
+        const persisted = syncedTasks.find((pt) => pt.id === task.id);
         return persisted ? { ...task, estado: persisted.estado as Task["estado"] } : task;
       });
     const completedTasks = advTasks.filter((t) => t.estado === "completada").length;
@@ -280,7 +287,6 @@ export function ManagerTeam() {
       prioridad: newPriority,
       notaPrioridad: priorityNote,
     });
-    setAdvisorTasks((prev) => prev.map((t) => (t.id === selectedTask.id ? { ...t, prioridad: newPriority } : t)));
     setSelectedTask(null);
     setPriorityNote("");
   };
@@ -302,7 +308,7 @@ export function ManagerTeam() {
   };
 
   const getPersistedNotes = (taskId: string) => {
-    const t = getPersistedTasks().find((x) => x.id === taskId);
+    const t = syncedTasks.find((x) => x.id === taskId);
     return { notasAsesora: t?.notasAsesora, notaPrioridad: t?.notaPrioridad };
   };
 
@@ -342,6 +348,14 @@ export function ManagerTeam() {
       </div>
     );
   };
+
+  if (loading) {
+    return (
+      <div className={styles.spinnerContainer}>
+        <Spinner label="Cargando equipo..." />
+      </div>
+    );
+  }
 
   if (selectedAdvisor) {
     const advisor = advisors.find((a) => a.id === selectedAdvisor);

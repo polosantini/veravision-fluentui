@@ -1,12 +1,4 @@
-import { useState } from "react";
-import {
-  makeStyles,
-  shorthands,
-  tokens,
-  Card,
-  Button,
-  Badge,
-} from "@fluentui/react-components";
+import { makeStyles, shorthands, tokens, Card, Button, Badge, Spinner } from "@fluentui/react-components";
 import {
   AlertRegular,
   AlertOffRegular,
@@ -21,9 +13,9 @@ import {
 } from "@fluentui/react-icons";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-import { alerts, type Alert } from "../../data/mock-data";
+import { useAlertsSync } from "../../hooks/useAlertsSync";
+import { type Alert } from "../../data/mock-data";
 
-// Configuración de tipo de alerta usando tokens de Fluent
 const typeConfig: Record<
   Alert["tipo"],
   {
@@ -71,9 +63,7 @@ const typeConfig: Record<
   },
 };
 
-const priorityColor = (
-  p: Alert["prioridad"]
-): "danger" | "warning" | "important" | "informative" => {
+const priorityColor = (p: Alert["prioridad"]): "danger" | "warning" | "important" | "informative" => {
   const m = { urgente: "danger", alta: "warning", media: "important", baja: "informative" } as const;
   return m[p];
 };
@@ -169,22 +159,28 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground2,
     marginTop: "12px",
   },
+  spinnerContainer: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: "40px",
+  },
 });
 
 export function AdvisorAlerts() {
   const styles = useStyles();
-  const [localAlerts, setLocalAlerts] = useState(alerts);
+  const { alerts, loading, markAsRead, markAllAsRead } = useAlertsSync();
 
-  const markAsRead = (id: string) => {
-    setLocalAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, leida: true } : a)));
-  };
+  if (loading) {
+    return (
+      <div className={styles.spinnerContainer}>
+        <Spinner label="Cargando alertas..." />
+      </div>
+    );
+  }
 
-  const markAllAsRead = () => {
-    setLocalAlerts((prev) => prev.map((a) => ({ ...a, leida: true })));
-  };
-
-  const unread = localAlerts.filter((a) => !a.leida);
-  const read = localAlerts.filter((a) => a.leida);
+  const unread = alerts.filter((a) => !a.leida);
+  const read = alerts.filter((a) => a.leida);
 
   const renderAlert = (alert: Alert, isUnread: boolean) => {
     const cfg = typeConfig[alert.tipo];
@@ -193,10 +189,7 @@ export function AdvisorAlerts() {
     return (
       <div key={alert.id} className={isUnread ? styles.unreadCard : styles.alertCard}>
         <div className={styles.alertRow}>
-          <div
-            className={styles.iconContainer}
-            style={{ backgroundColor: cfg.iconBgToken, color: cfg.iconColorToken }}
-          >
+          <div className={styles.iconContainer} style={{ backgroundColor: cfg.iconBgToken, color: cfg.iconColorToken }}>
             <Icon style={{ width: "18px", height: "18px" }} />
           </div>
           <div className={styles.contentContainer}>
@@ -242,7 +235,7 @@ export function AdvisorAlerts() {
     <div className={styles.container}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div className={styles.timestamp}>
-          {unread.length} alertas sin leer · {localAlerts.length} totales
+          {unread.length} alertas sin leer · {alerts.length} totales
         </div>
         {unread.length > 0 && (
           <Button size="small" appearance="secondary" icon={<CheckmarkRegular />} onClick={markAllAsRead}>
@@ -260,13 +253,11 @@ export function AdvisorAlerts() {
       {read.length > 0 && (
         <div>
           <div className={styles.sectionTitle}>ANTERIORES</div>
-          <div className={styles.readSection}>
-            {read.map((a) => renderAlert(a, false))}
-          </div>
+          <div className={styles.readSection}>{read.map((a) => renderAlert(a, false))}</div>
         </div>
       )}
 
-      {localAlerts.length === 0 && (
+      {alerts.length === 0 && (
         <Card className={styles.emptyCard}>
           <AlertOffRegular className={styles.emptyIcon} />
           <div className={styles.emptyText}>No hay alertas</div>

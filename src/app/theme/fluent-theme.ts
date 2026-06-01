@@ -29,3 +29,4 @@ export const veraVisionTheme: Theme = {
   colorStatusSuccessBackground: "#F1FAF1",
   colorStatusSuccessForeground: "#0E700E",
 };
+

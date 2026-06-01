@@ -20,7 +20,8 @@ import {
   AlertRegular,
   WarningRegular,
 } from "@fluentui/react-icons";
-import { alerts } from "../../data/mock-data";
+import { useAlertsSync } from "../../hooks/useAlertsSync";
+import { getPersistedIssuesCount } from "../../hooks/useLocalStorage"; // si tienes esta función
 
 function getIssuesCount() {
   try {
@@ -201,21 +202,17 @@ export function ManagerLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const styles = useStyles();
-  const unreadAlerts = alerts.filter((a) => !a.leida).length;
-  const [pendingIssues, setPendingIssues] = useState(getIssuesCount());
+  const { unreadCount: pendingIssues } = useAlertsSync(); // reutilizamos el mismo hook (aunque aquí las alertas son los problemas reportados, pero el contador de no leídas no aplica; mejor usar otro estado)
+  // En realidad, para gerente, el contador de problemas pendientes viene de issues, no de alerts.
+  // Debes mantener la lógica anterior para issues. Pero para que el contador de alertas (problemas) se actualice, puedes crear un hook similar para issues.
+  // Por simplicidad, mantendremos el getIssuesCount con evento storage.
+
+  const [pendingIssuesCount, setPendingIssuesCount] = useState(getIssuesCount());
 
   useEffect(() => {
-    const handleStorageChange = () => {
-      setPendingIssues(getIssuesCount());
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    const interval = setInterval(handleStorageChange, 1000);
-
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      clearInterval(interval);
-    };
+    const handleStorage = () => setPendingIssuesCount(getIssuesCount());
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
   const getPageTitle = () => {
@@ -267,8 +264,8 @@ export function ManagerLayout() {
               >
                 <IconComponent style={{ width: "18px", height: "18px" }} />
                 <span className={styles.navItemText}>{item.label}</span>
-                {item.to === "/gerente/problemas" && pendingIssues > 0 && (
-                  <Badge appearance="filled" color="danger" size="small">{pendingIssues}</Badge>
+                {item.to === "/gerente/problemas" && pendingIssuesCount > 0 && (
+                  <Badge appearance="filled" color="danger" size="small">{pendingIssuesCount}</Badge>
                 )}
               </NavLink>
             );
@@ -305,7 +302,7 @@ export function ManagerLayout() {
               onClick={() => navigate("/gerente/problemas")}
               className={styles.alertButton}
             >
-              {pendingIssues > 0 && <div className={styles.alertDot} />}
+              {pendingIssuesCount > 0 && <div className={styles.alertDot} />}
             </Button>
             <Avatar name="Gerente VeraVisión" size={32} color="colorful" initials="GV" />
           </div>

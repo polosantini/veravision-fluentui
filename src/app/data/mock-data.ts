@@ -211,7 +211,7 @@ export const issues: Issue[] = [
   { id: "i4", titulo: "Error al guardar notas de contacto", descripcion: "A veces las notas no se guardan cuando marco como completada una tarea. Pierdo el registro.", categoria: "tecnico", prioridad: "alta", estado: "pendiente", reportadoPor: "a2", reportadoPorNombre: "Laura Gómez", fechaReporte: today },
 ];
 
-// --- Helper functions (sin cambios, pero actualizo getStatusLabel y demás) ---
+// --- Helper functions ---
 export function getStatusLabel(status: PatientStatus): string {
   const map: Record<PatientStatus, string> = {
     "post-venta": "Post-Venta",

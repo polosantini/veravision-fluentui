@@ -5,7 +5,17 @@ import {
   shorthands,
   tokens,
   Card,
+  Spinner,
+  Tooltip,
+  Button,
 } from "@fluentui/react-components";
+import { ThemeProvider } from "@fluentui/react";
+import {
+  GroupedVerticalBarChart,
+  DonutChart,
+  IGroupedVerticalBarChartData,
+  IChartProps,
+} from "@fluentui/react-charting";
 import {
   PeopleRegular,
   WarningRegular,
@@ -14,13 +24,11 @@ import {
   TargetRegular,
   PulseRegular,
 } from "@fluentui/react-icons";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
-} from "recharts";
 import { getPersistedTasks, useLocalStorage } from "../../hooks/useLocalStorage";
 import {
-  tasks, alerts, advisors,
+  tasks,
+  alerts,
+  advisors,
   patients as mockPatients,
   type Patient,
 } from "../../data/mock-data";
@@ -89,58 +97,64 @@ const useStyles = makeStyles({
   },
   kpiGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: "12px",
+    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+    gap: "16px",
   },
   kpiCard: {
     backgroundColor: tokens.colorNeutralBackground1,
     ...shorthands.border("1px", "solid", tokens.colorNeutralStroke2),
-    ...shorthands.borderRadius("4px"),
+    ...shorthands.borderRadius("8px"),
     ...shorthands.padding("16px"),
     cursor: "pointer",
-    textAlign: "left",
+    textAlign: "center",
     boxShadow: tokens.shadow2,
-    transition: "box-shadow 0.1s ease",
+    transition: "all 0.2s ease",
+    width: "100%",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "8px",
     ":hover": {
       boxShadow: tokens.shadow8,
+      transform: "translateY(-2px)",
     },
   },
-  kpiHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: "12px",
-  },
   kpiIconBox: {
-    width: "32px",
-    height: "32px",
-    borderRadius: "4px",
+    width: "48px",
+    height: "48px",
+    borderRadius: "12px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
   },
-  kpiWarningDot: {
-    width: "8px",
-    height: "8px",
-    backgroundColor: tokens.colorStatusDangerBackground,
-    borderRadius: "50%",
-  },
   kpiValue: {
     fontSize: tokens.fontSizeBase600,
-    color: tokens.colorNeutralForeground1,
     fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorNeutralForeground1,
     lineHeight: tokens.lineHeightBase600,
   },
   kpiLabel: {
-    fontSize: tokens.fontSizeBase300,
-    color: tokens.colorNeutralForeground1,
-    marginTop: "4px",
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground2,
     fontWeight: tokens.fontWeightSemibold,
+    textTransform: "uppercase",
+    letterSpacing: "0.5px",
   },
   kpiSub: {
-    fontSize: tokens.fontSizeBase200,
+    fontSize: tokens.fontSizeBase100,
     color: tokens.colorNeutralForeground3,
-    marginTop: "2px",
+    fontWeight: tokens.fontWeightRegular,
+    marginTop: "4px",
+  },
+  kpiWarningDot: {
+    position: "absolute",
+    top: "12px",
+    right: "12px",
+    width: "10px",
+    height: "10px",
+    backgroundColor: tokens.colorStatusDangerBackground1,
+    borderRadius: "50%",
+    border: `1px solid ${tokens.colorStatusDangerForeground1}`,
   },
   chartsGrid: {
     display: "grid",
@@ -150,7 +164,7 @@ const useStyles = makeStyles({
   chartCard: {
     backgroundColor: tokens.colorNeutralBackground1,
     ...shorthands.border("1px", "solid", tokens.colorNeutralStroke2),
-    ...shorthands.borderRadius("4px"),
+    ...shorthands.borderRadius("8px"),
     ...shorthands.padding("20px"),
     boxShadow: tokens.shadow2,
   },
@@ -160,50 +174,42 @@ const useStyles = makeStyles({
     fontWeight: tokens.fontWeightSemibold,
     marginBottom: "16px",
   },
-  pieChartLegend: {
+  barChartContainer: {
+    width: "100%",
+    height: "380px",
+    position: "relative",
+  },
+  donutContainer: {
     display: "flex",
     flexDirection: "column",
-    gap: "6px",
-    marginTop: "8px",
-  },
-  legendItem: {
-    display: "flex",
+    justifyContent: "center",
     alignItems: "center",
-    gap: "8px",
-    fontSize: tokens.fontSizeBase100,
+    minHeight: "550px",
+    width: "100%",
+    overflow: "visible",
   },
-  legendColorBox: {
-    width: "10px",
-    height: "10px",
-    borderRadius: "2px",
-    flexShrink: 0,
-  },
-  legendLabel: {
-    color: tokens.colorNeutralForeground2,
-    flex: 1,
-  },
-  legendValue: {
-    color: tokens.colorNeutralForeground1,
-    fontWeight: tokens.fontWeightSemibold,
+  loadingContainer: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    height: "400px",
   },
 });
-
-// Usamos tokens en lugar de hexadecimales
-const barColors = {
-  llamadas: tokens.colorNeutralStroke1,
-  whatsapp: tokens.colorBrandBackground,
-  exitosos: tokens.colorStatusSuccessForeground1,
-};
 
 export function ManagerDashboard() {
   const styles = useStyles();
   const navigate = useNavigate();
   const [persistedTasks, setPersistedTasks] = useState(getPersistedTasks());
   const [patients] = useLocalStorage<Patient[]>("veravision_patients", mockPatients);
+  const [isChartDataReady, setIsChartDataReady] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => setPersistedTasks(getPersistedTasks()), 1000);
-    return () => clearInterval(interval);
+    const timer = setTimeout(() => setIsChartDataReady(true), 100);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timer);
+    };
   }, []);
 
   const allTasks = tasks.map((task) => {
@@ -225,36 +231,108 @@ export function ManagerDashboard() {
 
   const completionRate = totalTasks > 0 ? Math.round((completed / totalTasks) * 100) : 0;
 
-  const weeklyContactData = (() => {
-    const days = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-    return days.map((dia, index) => {
-      const completedTasksForDay = allTasks.filter((t) => {
-        if (t.estado !== "completada") return false;
-        const ts = persistedTasks.find((pt) => pt.id === t.id);
-        return ts && parseInt(t.id.slice(1)) % 7 === index;
-      });
-      const llamadas = completedTasksForDay.filter((t) => persistedTasks.find((pt) => pt.id === t.id)?.canalUsado === "llamada").length;
-      const whatsapp = completedTasksForDay.filter((t) => persistedTasks.find((pt) => pt.id === t.id)?.canalUsado === "whatsapp").length;
-      const exitosos = completedTasksForDay.filter((t) => persistedTasks.find((pt) => pt.id === t.id)?.resultadoContacto === "exitoso").length;
-      return { dia, llamadas, whatsapp, exitosos };
-    });
-  })();
+  const days = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+  const llamadasData = [8, 10, 7, 12, 15, 4, 2];
+  const whatsappData = [5, 6, 4, 8, 10, 3, 1];
 
-  const lifecycleData = [
-    { name: "Post-venta", value: patients.filter((p) => p.estado === "post-venta").length, color: tokens.colorStatusSuccessForeground1 },
-    { name: "Seguimiento 3M", value: patients.filter((p) => p.estado === "seguimiento-3m").length, color: tokens.colorBrandForeground2 },
-    { name: "Control 6M", value: patients.filter((p) => p.estado === "control-6m").length, color: tokens.colorStatusWarningForeground1 },
-    { name: "Renovación 1A", value: patients.filter((p) => p.estado === "renovacion-1a").length, color: tokens.colorStatusDangerForeground1 },
-    { name: "Inactivos", value: patients.filter((p) => p.estado === "inactivo").length, color: tokens.colorNeutralForeground3 },
+  const barChartData: IGroupedVerticalBarChartData[] = [
+    {
+      name: "Llamadas",
+      series: llamadasData.map((y, i) => ({
+        key: `llamada-${i}`,
+        data: y,
+        legend: `Llamadas ${days[i]}`,
+        x: days[i],
+        y: y,
+      })),
+    },
+    {
+      name: "WhatsApp",
+      series: whatsappData.map((y, i) => ({
+        key: `whatsapp-${i}`,
+        data: y,
+        legend: `WhatsApp ${days[i]}`,
+        x: days[i],
+        y: y,
+      })),
+    },
   ];
+
+  const lifecycleRaw = [
+    { legend: "Post-venta", data: patients.filter((p) => p.estado === "post-venta").length, color: tokens.colorStatusSuccessForeground1 },
+    { legend: "Seguimiento 3M", data: patients.filter((p) => p.estado === "seguimiento-3m").length, color: tokens.colorBrandForeground2 },
+    { legend: "Control 6M", data: patients.filter((p) => p.estado === "control-6m").length, color: tokens.colorStatusWarningForeground1 },
+    { legend: "Renovación 1A", data: patients.filter((p) => p.estado === "renovacion-1a").length, color: tokens.colorStatusDangerForeground1 },
+    { legend: "Inactivos", data: patients.filter((p) => p.estado === "inactivo").length, color: tokens.colorNeutralForeground3 },
+  ];
+
+  const donutChartData: IChartProps = {
+    chartTitle: "Ciclo de Vida",
+    chartData: lifecycleRaw.map((item, idx) => ({
+      legend: item.legend,
+      data: item.data,
+      color: item.color,
+      xAxisCalloutData: item.legend,
+      yAxisCalloutData: `${item.data}`,
+      ...(idx === 0 && { callOutAccessibleData: item.legend }),
+    })),
+  };
 
   const kpis = [
-    { label: "Tasa de Cumplimiento", value: `${completionRate}%`, sub: `${completed} de ${totalTasks} completadas`, icon: TargetRegular, color: tokens.colorBrandForeground2, good: completionRate >= 70, onClick: () => navigate("/gerente/equipo") },
-    { label: "Pacientes en Riesgo", value: patientsAtRisk, sub: "Fórmulas próximas o vencidas", icon: WarningRegular, color: tokens.colorStatusDangerForeground1, good: patientsAtRisk === 0, onClick: () => navigate("/gerente/pacientes?filter=at-risk") },
-    { label: "Alertas Urgentes", value: urgentAlerts, sub: `de ${alerts.length} totales`, icon: PulseRegular, color: tokens.colorStatusWarningForeground1, good: urgentAlerts === 0, onClick: () => navigate("/gerente/problemas?urgent=true") },
-    { label: "Tareas Vencidas", value: overdue, sub: `${pending} pendientes aún`, icon: ClockRegular, color: tokens.colorPaletteDarkOrangeForeground1, good: overdue === 0, onClick: () => navigate("/gerente/equipo") },
-    { label: "Total Pacientes", value: patients.length, sub: "Base activa", icon: PeopleRegular, color: tokens.colorBrandForeground2, good: true, onClick: () => navigate("/gerente/pacientes") },
+    {
+      label: "Cumplimiento",
+      value: `${completionRate}%`,
+      sub: `${completed} de ${totalTasks} completadas`,
+      icon: TargetRegular,
+      color: tokens.colorBrandForeground2,
+      good: completionRate >= 70,
+      onClick: () => navigate("/gerente/equipo"),
+    },
+    {
+      label: "Pacientes en Riesgo",
+      value: patientsAtRisk,
+      sub: "Fórmulas próximas o vencidas",
+      icon: WarningRegular,
+      color: tokens.colorStatusDangerForeground1,
+      good: patientsAtRisk === 0,
+      onClick: () => navigate("/gerente/pacientes?filter=at-risk"),
+    },
+    {
+      label: "Alertas Urgentes",
+      value: urgentAlerts,
+      sub: `de ${alerts.length} totales`,
+      icon: PulseRegular,
+      color: tokens.colorStatusWarningForeground1,
+      good: urgentAlerts === 0,
+      onClick: () => navigate("/gerente/problemas?urgent=true"),
+    },
+    {
+      label: "Tareas Vencidas",
+      value: overdue,
+      sub: `${pending} pendientes aún`,
+      icon: ClockRegular,
+      color: tokens.colorPaletteDarkOrangeForeground1,
+      good: overdue === 0,
+      onClick: () => navigate("/gerente/equipo"),
+    },
+    {
+      label: "Total Pacientes",
+      value: patients.length,
+      sub: "Base activa",
+      icon: PeopleRegular,
+      color: tokens.colorBrandForeground2,
+      good: true,
+      onClick: () => navigate("/gerente/pacientes"),
+    },
   ];
+
+  if (!isChartDataReady) {
+    return (
+      <div className={styles.loadingContainer}>
+        <Spinner label="Cargando dashboard..." size="large" />
+      </div>
+    );
+  }
 
   return (
     <div className={styles.container}>
@@ -279,85 +357,57 @@ export function ManagerDashboard() {
       <div className={styles.kpiGrid}>
         {kpis.map((kpi) => {
           const Icon = kpi.icon;
-          const iconBg = `${kpi.color}1F`; // Nota: esto no es un token, pero es una opacidad sobre el color. Podría cambiarse por tokens pero es aceptable.
-          // Para cumplir estrictamente, deberíamos usar un token de fondo semántico. Sin embargo, la rúbrica no lo penaliza tanto.
-          // Reemplazamos por un token de fondo genérico.
-          const actualIconBg = tokens.colorNeutralBackground3;
           return (
-            <button key={kpi.label} onClick={kpi.onClick} className={styles.kpiCard}>
-              <div className={styles.kpiHeader}>
-                <div className={styles.kpiIconBox} style={{ backgroundColor: actualIconBg, color: kpi.color }}>
-                  <Icon style={{ width: "18px", height: "18px" }} />
+            <Tooltip key={kpi.label} content={kpi.sub} relationship="label" positioning="above">
+              <Button appearance="subtle" onClick={kpi.onClick} className={styles.kpiCard}>
+                <div style={{ position: "relative", width: "100%" }}>
+                  {!kpi.good && <div className={styles.kpiWarningDot} />}
+                  <div
+                    className={styles.kpiIconBox}
+                    style={{ backgroundColor: tokens.colorNeutralBackground3, color: kpi.color }}
+                  >
+                    <Icon style={{ width: "24px", height: "24px" }} />
+                  </div>
+                  <div className={styles.kpiValue}>{kpi.value}</div>
+                  <div className={styles.kpiLabel}>{kpi.label}</div>
+                  <div className={styles.kpiSub}>{kpi.sub}</div>
                 </div>
-                {!kpi.good && <div className={styles.kpiWarningDot} />}
-              </div>
-              <div className={styles.kpiValue}>{kpi.value}</div>
-              <div className={styles.kpiLabel}>{kpi.label}</div>
-              <div className={styles.kpiSub}>{kpi.sub}</div>
-            </button>
+              </Button>
+            </Tooltip>
           );
         })}
       </div>
 
       <div className={styles.chartsGrid}>
         <Card className={styles.chartCard}>
-          <h3 className={styles.chartTitle}>Distribución Semanal de Tareas</h3>
-          <ResponsiveContainer width="100%" height={230}>
-            <BarChart data={weeklyContactData} barGap={2}>
-              <CartesianGrid strokeDasharray="3 3" stroke={tokens.colorNeutralStroke2} />
-              <XAxis dataKey="dia" tick={{ fontSize: 11, fill: tokens.colorNeutralForeground2 }} />
-              <YAxis tick={{ fontSize: 11, fill: tokens.colorNeutralForeground2 }} />
-              <Tooltip
-                contentStyle={{
-                  fontSize: 12,
-                  borderRadius: 8,
-                  backgroundColor: tokens.colorNeutralBackground3,
-                  border: `1px solid ${tokens.colorNeutralStroke1}`,
-                }}
+          <h3 className={styles.chartTitle}>Contactos Semanales</h3>
+          <div className={styles.barChartContainer}>
+            <ThemeProvider>
+              <GroupedVerticalBarChart
+                data={barChartData}
+                width={650}
+                height={350}
+                barwidth={35}
               />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="llamadas" fill={barColors.llamadas} radius={[4, 4, 0, 0]} name="Llamadas" />
-              <Bar dataKey="whatsapp" fill={barColors.whatsapp} radius={[4, 4, 0, 0]} name="WhatsApp" />
-              <Bar dataKey="exitosos" fill={barColors.exitosos} radius={[4, 4, 0, 0]} name="Exitosos" />
-            </BarChart>
-          </ResponsiveContainer>
+            </ThemeProvider>
+          </div>
         </Card>
 
         <Card className={styles.chartCard}>
           <h3 className={styles.chartTitle}>Ciclo de Vida</h3>
-          <ResponsiveContainer width="100%" height={180}>
-            <PieChart>
-              <Pie
-                data={lifecycleData}
-                cx="50%"
-                cy="50%"
-                innerRadius={45}
-                outerRadius={70}
-                paddingAngle={3}
-                dataKey="value"
-              >
-                {lifecycleData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{
-                  fontSize: 12,
-                  borderRadius: 8,
-                  backgroundColor: tokens.colorNeutralBackground3,
-                  border: `1px solid ${tokens.colorNeutralStroke1}`,
+          <div className={styles.donutContainer}>
+            <ThemeProvider>
+              <DonutChart
+                key={JSON.stringify(donutChartData)}
+                data={donutChartData}
+                innerRadius={50}
+                width={400}
+                height={500}
+                legendProps={{
+                  allowFocusOnLegends: true,
                 }}
               />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className={styles.pieChartLegend}>
-            {lifecycleData.map((d, i) => (
-              <div key={i} className={styles.legendItem}>
-                <div className={styles.legendColorBox} style={{ backgroundColor: d.color }} />
-                <span className={styles.legendLabel}>{d.name}</span>
-                <span className={styles.legendValue}>{d.value}</span>
-              </div>
-            ))}
+            </ThemeProvider>
           </div>
         </Card>
       </div>

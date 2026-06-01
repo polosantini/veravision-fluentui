@@ -7,10 +7,6 @@ import {
   Button,
   Avatar,
   Badge,
-  Drawer,
-  DrawerBody,
-  DrawerHeader,
-  DrawerHeaderTitle,
 } from "@fluentui/react-components";
 import {
   ClipboardTaskRegular,
@@ -23,7 +19,9 @@ import {
   CalendarRegular,
   WarningRegular,
 } from "@fluentui/react-icons";
-import { alerts, tasks } from "../../data/mock-data";
+import { tasks as staticTasks } from "../../data/mock-data";
+import { useTasksSync } from "../../hooks/useTasksSync";
+import { useAlertsSync } from "../../hooks/useAlertsSync";
 
 const getLoggedUser = () => {
   try {
@@ -180,7 +178,7 @@ const useStyles = makeStyles({
     right: "4px",
     width: "8px",
     height: "8px",
-    backgroundColor: tokens.colorStatusDangerBackground,
+    backgroundColor: tokens.colorStatusDangerBackground1,
     borderRadius: "50%",
   },
   main: {
@@ -203,15 +201,27 @@ export function AdvisorLayout() {
   const navigate = useNavigate();
   const styles = useStyles();
 
+  const { unreadCount: myAlerts } = useAlertsSync();
+  const { tasks: syncedTasks, loading: tasksLoading } = useTasksSync();
+
   useEffect(() => {
     const loggedUser = getLoggedUser();
     setUser(loggedUser);
   }, []);
 
-  const myAlerts = alerts.filter((a) => !a.leida).length;
-  const myPendingTasks = tasks.filter(
-    (t) => t.asesorAsignado === user.id && (t.estado === "pendiente" || t.estado === "vencida")
-  ).length;
+  // Calcular tareas pendientes y vencidas del usuario actual
+  const myPendingTasks = (() => {
+    if (tasksLoading) return 0;
+    // Combinar tareas estáticas con estado persistido
+    const combinedTasks = staticTasks.map((task) => {
+      const persisted = syncedTasks.find((pt) => pt.id === task.id);
+      return persisted ? { ...task, estado: persisted.estado } : task;
+    });
+    const userTasks = combinedTasks.filter(
+      (t) => t.asesorAsignado === user.id && (t.estado === "pendiente" || t.estado === "vencida")
+    );
+    return userTasks.length;
+  })();
 
   const getPageTitle = () => {
     const path = location.pathname;
@@ -229,7 +239,6 @@ export function AdvisorLayout() {
 
   return (
     <div className={styles.container}>
-      {/* Sidebar */}
       <aside className={sidebarClasses}>
         <div className={styles.sidebarHeader}>
           <div className={styles.logoContainer}>

@@ -7,6 +7,7 @@ import {
   Button,
   Badge,
   Tooltip,
+  Spinner,
 } from "@fluentui/react-components";
 import {
   CalendarRegular,
@@ -19,7 +20,7 @@ import {
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, isSameMonth, startOfWeek, endOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
 import { tasks, getTaskTypeLabel, type Task } from "../../data/mock-data";
-import { getPersistedTasks } from "../../hooks/useLocalStorage";
+import { useTasksSync } from "../../hooks/useTasksSync";
 
 const getLoggedUser = () => {
   try { return JSON.parse(localStorage.getItem("veravision_user") || "{}"); }
@@ -111,12 +112,12 @@ const useStyles = makeStyles({
     transition: "all 0.15s ease",
     width: "100%",
     ":hover": {
-      borderColor: tokens.colorBrandStroke2,
+      ...shorthands.borderColor(tokens.colorBrandStroke2),
       backgroundColor: tokens.colorNeutralBackground3,
     },
   },
   daySelected: {
-    borderColor: tokens.colorBrandStroke2,
+    ...shorthands.borderColor(tokens.colorBrandStroke2),
     backgroundColor: tokens.colorBrandBackground2,
   },
   dayNumberContainer: {
@@ -175,7 +176,7 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground1,
   },
   taskDetailCard: {
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    ...shorthands.border("1px", "solid", tokens.colorNeutralStroke2),
     borderRadius: tokens.borderRadiusMedium,
     padding: "12px",
   },
@@ -217,6 +218,12 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase200,
     color: tokens.colorNeutralForeground2,
   },
+  spinnerContainer: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: "40px",
+  },
 });
 
 export function AdvisorCalendar() {
@@ -224,17 +231,17 @@ export function AdvisorCalendar() {
   const [user] = useState(getLoggedUser());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const { tasks: syncedTasks, loading } = useTasksSync();
 
-  const persistedTasks = getPersistedTasks();
   const myTasks = useMemo(() => {
     return tasks
       .filter((t) => t.asesorAsignado === user.id)
       .map((task) => {
-        const persisted = persistedTasks.find((pt) => pt.id === task.id);
+        const persisted = syncedTasks.find((pt) => pt.id === task.id);
         return persisted ? { ...task, estado: persisted.estado as Task["estado"] } : task;
       })
       .filter((t) => t.estado !== "completada" && t.estado !== ("cancelada" as any));
-  }, [persistedTasks, user.id]);
+  }, [syncedTasks, user.id]);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -244,6 +251,14 @@ export function AdvisorCalendar() {
 
   const getTasksForDay = (day: Date) => myTasks.filter((t) => isSameDay(t.fechaLimite, day));
   const selectedDayTasks = selectedDate ? getTasksForDay(selectedDate) : [];
+
+  if (loading) {
+    return (
+      <div className={styles.spinnerContainer}>
+        <Spinner label="Cargando calendario..." />
+      </div>
+    );
+  }
 
   return (
     <div className={styles.container}>

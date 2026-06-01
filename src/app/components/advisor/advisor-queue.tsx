@@ -6,9 +6,10 @@ import {
   Card,
   Button,
   Badge,
-  Input,
   Divider,
   Tooltip,
+  Spinner,
+  Input,
 } from "@fluentui/react-components";
 import {
   CallRegular,
@@ -18,19 +19,14 @@ import {
   WarningRegular,
   PlayRegular,
   ArrowSyncRegular,
-  FlashRegular,
   SendRegular,
   DismissRegular,
   ProhibitedRegular,
 } from "@fluentui/react-icons";
 import { differenceInDays } from "date-fns";
-import {
-  tasks,
-  getTaskTypeLabel,
-  type Task,
-  type TaskStatus,
-} from "../../data/mock-data";
-import { persistTask, getPersistedTasks } from "../../hooks/useLocalStorage";
+import { tasks, getTaskTypeLabel, type Task, type TaskStatus } from "../../data/mock-data";
+import { useTasksSync } from "../../hooks/useTasksSync";
+import { persistTask, updatePatientFromCompletedTask } from "../../hooks/useLocalStorage";
 
 const getLoggedUser = () => {
   try {
@@ -83,7 +79,7 @@ const useStyles = makeStyles({
     ...shorthands.overflow("hidden"),
   },
   taskPadding: {
-    padding: "16px",
+    ...shorthands.padding("16px"),
   },
   taskHeader: {
     display: "flex",
@@ -91,8 +87,8 @@ const useStyles = makeStyles({
     gap: "12px",
   },
   taskIcon: {
-    marginTop: "2px",
     flexShrink: 0,
+    marginTop: "2px",
   },
   taskContent: {
     flex: 1,
@@ -193,11 +189,18 @@ const useStyles = makeStyles({
   completedSection: {
     opacity: 0.65,
   },
+  spinnerContainer: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    ...shorthands.padding("40px"),
+  },
 });
 
 export function AdvisorQueue() {
   const styles = useStyles();
   const [user] = useState(getLoggedUser());
+  const { tasks: syncedTasks, loading } = useTasksSync();
   const [localTasks, setLocalTasks] = useState<Task[]>([]);
   const [activeLogId, setActiveLogId] = useState<string | null>(null);
   const [logResult, setLogResult] = useState("exitoso");
@@ -205,15 +208,14 @@ export function AdvisorQueue() {
   const [logChannel, setLogChannel] = useState<"llamada" | "whatsapp">("llamada");
 
   useEffect(() => {
-    const persistedTasks = getPersistedTasks();
     const myTasks = tasks
       .filter((t) => t.asesorAsignado === user.id)
       .map((task) => {
-        const persisted = persistedTasks.find((pt) => pt.id === task.id);
+        const persisted = syncedTasks.find((pt) => pt.id === task.id);
         return persisted ? { ...task, estado: persisted.estado as TaskStatus } : task;
       });
     setLocalTasks(myTasks);
-  }, [user.id]);
+  }, [syncedTasks, user.id]);
 
   const pending = localTasks.filter((t) => t.estado === "pendiente" || t.estado === "vencida");
   const inProgress = localTasks.filter((t) => t.estado === "en-progreso");
@@ -272,29 +274,35 @@ export function AdvisorQueue() {
 
   const startTask = (id: string) => {
     persistTask({ id, estado: "en-progreso", updatedAt: new Date().toISOString() });
-    setLocalTasks((prev) => prev.map((t) => (t.id === id ? { ...t, estado: "en-progreso" } : t)));
   };
 
   const completeTask = (id: string) => {
     const task = localTasks.find((t) => t.id === id);
+    if (!task) return;
+
+    // Persistir la tarea como completada
     persistTask({
       id,
       estado: "completada",
       updatedAt: new Date().toISOString(),
       notasAsesora: logNotes.trim() || undefined,
-      prioridad: task?.prioridad,
-      tipoTarea: task?.tipo,
+      prioridad: task.prioridad,
+      tipoTarea: task.tipo,
       canalUsado: logChannel,
       resultadoContacto: logResult as any,
     });
-    setLocalTasks((prev) => prev.map((t) => (t.id === id ? { ...t, estado: "completada" } : t)));
+
+    // Si el contacto fue exitoso, actualizar los datos del paciente (historial, estado, fechas)
+    if (logResult === "exitoso") {
+      updatePatientFromCompletedTask(task, logResult, logNotes, logChannel);
+    }
+
     setActiveLogId(null);
     setLogNotes("");
   };
 
   const cancelTask = (id: string) => {
     persistTask({ id, estado: "cancelada", updatedAt: new Date().toISOString() });
-    setLocalTasks((prev) => prev.map((t) => (t.id === id ? { ...t, estado: "cancelada" as any } : t)));
   };
 
   const openLog = (id: string, channel: "llamada" | "whatsapp") => {
@@ -391,7 +399,7 @@ export function AdvisorQueue() {
           <div className={styles.logArea}>
             <div className={styles.logHeader}>
               <div className={styles.logTitle}>
-                <FlashRegular style={{ width: "16px", height: "16px", color: tokens.colorStatusWarningForeground1 }} />
+                <WarningRegular style={{ width: "16px", height: "16px", color: tokens.colorStatusWarningForeground1 }} />
                 <span className={styles.logTitleText}>
                   Registrar {logChannel === "llamada" ? "Llamada" : "WhatsApp"}
                 </span>
@@ -403,23 +411,16 @@ export function AdvisorQueue() {
 
             <div className={styles.resultLabel}>Resultado del contacto:</div>
             <div className={styles.resultButtons}>
-              {resultOptions.map((r) => {
-                const selected = logResult === r.value;
-                return (
-                  <Button
-                    key={r.value}
-                    size="small"
-                    appearance={selected ? "primary" : "secondary"}
-                    onClick={() => setLogResult(r.value)}
-                    style={{
-                      backgroundColor: selected ? r.color : undefined,
-                      borderColor: selected ? r.color : undefined,
-                    }}
-                  >
-                    {r.label}
-                  </Button>
-                );
-              })}
+              {resultOptions.map((r) => (
+                <Button
+                  key={r.value}
+                  size="small"
+                  appearance={logResult === r.value ? "primary" : "secondary"}
+                  onClick={() => setLogResult(r.value)}
+                >
+                  {r.label}
+                </Button>
+              ))}
             </div>
 
             <div className={styles.logInputRow}>
@@ -444,6 +445,14 @@ export function AdvisorQueue() {
     );
   };
 
+  if (loading) {
+    return (
+      <div className={styles.spinnerContainer}>
+        <Spinner label="Cargando tareas..." />
+      </div>
+    );
+  }
+
   return (
     <div className={styles.container}>
       <div className={styles.statsGrid}>
@@ -467,7 +476,6 @@ export function AdvisorQueue() {
         </Card>
       </div>
 
-      {/* Atención inmediata */}
       {sortTasks(pending).filter((t) => t.estado === "vencida" || t.prioridad === "urgente").length > 0 && (
         <div>
           <div className={styles.sectionHeader}>
@@ -484,7 +492,6 @@ export function AdvisorQueue() {
         </div>
       )}
 
-      {/* Pendientes regulares */}
       {sortTasks(pending).filter((t) => t.estado !== "vencida" && t.prioridad !== "urgente").length > 0 && (
         <div>
           <div className={styles.sectionHeader}>
@@ -501,7 +508,6 @@ export function AdvisorQueue() {
         </div>
       )}
 
-      {/* En progreso */}
       {inProgress.length > 0 && (
         <div>
           <div className={styles.sectionHeader}>
@@ -514,7 +520,6 @@ export function AdvisorQueue() {
         </div>
       )}
 
-      {/* Completadas */}
       {completed.length > 0 && (
         <div>
           <div className={styles.sectionHeader}>
