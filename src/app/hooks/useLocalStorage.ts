@@ -1,10 +1,47 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
+// ------------------------------------------------------------
+// Helper: reviveDates convierte strings ISO 8601 a objetos Date
+// ------------------------------------------------------------
+function reviveDates(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === "string") {
+    // Patrón para fechas ISO: 2025-01-15T03:00:00.000Z
+    const isoDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z?$/;
+    if (isoDateRegex.test(obj)) {
+      const date = new Date(obj);
+      if (!isNaN(date.getTime())) return date;
+    }
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map((item) => reviveDates(item));
+  }
+  if (typeof obj === "object") {
+    const newObj: any = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        newObj[key] = reviveDates(obj[key]);
+      }
+    }
+    return newObj;
+  }
+  return obj;
+}
+
+// ------------------------------------------------------------
+// Hook principal: useLocalStorage
+// ------------------------------------------------------------
 export function useLocalStorage<T>(key: string, initialValue: T) {
   const [storedValue, setStoredValue] = useState<T>(() => {
     try {
       const item = window.localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
+      if (item) {
+        const parsed = JSON.parse(item);
+        // Convertir fechas automáticamente
+        return reviveDates(parsed);
+      }
+      return initialValue;
     } catch (error) {
       console.error(`Error loading ${key} from localStorage:`, error);
       return initialValue;
@@ -24,6 +61,9 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
   return [storedValue, setValue] as const;
 }
 
+// ------------------------------------------------------------
+// Tipos y funciones específicas para tareas (PersistedTaskState)
+// ------------------------------------------------------------
 export interface PersistedTaskState {
   id: string;
   estado: "pendiente" | "en-progreso" | "completada" | "vencida" | "cancelada";

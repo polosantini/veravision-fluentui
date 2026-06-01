@@ -17,6 +17,8 @@ import {
   Avatar,
   MessageBar,
   MessageBarBody,
+  Dropdown,
+  Option,
 } from "@fluentui/react-components";
 import {
   SearchRegular,
@@ -36,6 +38,7 @@ import {
   getStatusLabel,
   type Patient,
 } from "../../data/mock-data";
+import { formatPhoneNumber, isValidPhoneNumber, isValidDocumentNumber } from "../../utils/format";
 
 const getLoggedUser = () => {
   try {
@@ -146,10 +149,15 @@ const useStyles = makeStyles({
     alignItems: "center",
     gap: "8px",
   },
-  formulaStatusText: (props: { color: string }) => ({
-    color: props.color,
-    marginTop: "2px",
-  }),
+  fullWidth: {
+    width: "100%",
+    marginTop: "4px",
+  },
+  formGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "12px",
+  },
 });
 
 export function AdvisorPatients() {
@@ -167,7 +175,8 @@ export function AdvisorPatients() {
   const [editing, setEditing] = useState<Patient | null>(null);
 
   const [nombre, setNombre] = useState("");
-  const [cedula, setCedula] = useState("");
+  const [tipoDocumento, setTipoDocumento] = useState<"CC" | "CE" | "NIT" | "Pasaporte">("CC");
+  const [numeroDocumento, setNumeroDocumento] = useState("");
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
   const [success, setSuccess] = useState(false);
@@ -176,6 +185,7 @@ export function AdvisorPatients() {
   const filtered = myPatients.filter(
     (p) =>
       p.nombre.toLowerCase().includes(search.toLowerCase()) ||
+      p.numeroDocumento.includes(search) ||
       p.telefono.includes(search)
   );
 
@@ -214,7 +224,8 @@ export function AdvisorPatients() {
     setEditing(null);
     setShowForm(true);
     setNombre("");
-    setCedula("");
+    setTipoDocumento("CC");
+    setNumeroDocumento("");
     setTelefono("");
     setEmail("");
     setError("");
@@ -225,7 +236,8 @@ export function AdvisorPatients() {
     setEditing(p);
     setShowForm(true);
     setNombre(p.nombre);
-    setCedula(p.cedula);
+    setTipoDocumento(p.tipoDocumento);
+    setNumeroDocumento(p.numeroDocumento);
     setTelefono(p.telefono);
     setEmail(p.email);
     setError("");
@@ -243,60 +255,36 @@ export function AdvisorPatients() {
     setError("");
     setSuccess(false);
 
-    if (!nombre.trim() || !cedula.trim() || !telefono.trim() || !email.trim()) {
-      setError("Todos los campos son obligatorios");
-      return;
-    }
-    if (!/^[\d.]+$/.test(cedula)) {
-      setError("La cédula debe contener solo números");
-      return;
-    }
-    if (!/^\d{3}-?\d{3}-?\d{4}$/.test(telefono)) {
-      setError("El teléfono debe tener formato válido (ej: 310-555-0101)");
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError("El correo electrónico no es válido");
-      return;
-    }
+    if (!nombre.trim()) { setError("El nombre es obligatorio"); return; }
+    if (!numeroDocumento.trim()) { setError("El número de documento es obligatorio"); return; }
+    if (!isValidDocumentNumber(numeroDocumento)) { setError("El número de documento debe contener solo dígitos (máx 15)"); return; }
+    if (!telefono.trim()) { setError("El celular es obligatorio"); return; }
+    if (!isValidPhoneNumber(telefono)) { setError("El celular debe tener 10 dígitos y empezar con 3 (formato: 321 6549870)"); return; }
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError("El correo electrónico no es válido"); return; }
+
+    const telefonoNormalizado = formatPhoneNumber(telefono);
+    const documentoRepetido = patients.some(p => p.numeroDocumento === numeroDocumento && p.id !== editing?.id);
+    if (documentoRepetido) { setError("Ya existe un paciente con este número de documento"); return; }
 
     if (editing) {
-      const dup = patients.find(
-        (p) =>
-          p.id !== editing.id && (p.cedula === cedula || p.email === email)
-      );
-      if (dup) {
-        setError(
-          "Ya existe otro paciente con esta cédula o correo electrónico"
-        );
-        return;
-      }
       setPatients(
         patients.map((p) =>
-          p.id === editing.id ? { ...p, nombre, cedula, telefono, email } : p
+          p.id === editing.id
+            ? { ...p, nombre, tipoDocumento, numeroDocumento, telefono: telefonoNormalizado, email }
+            : p
         )
       );
     } else {
-      const dup = patients.find(
-        (p) => p.cedula === cedula || p.email === email
-      );
-      if (dup) {
-        setError(
-          "Ya existe un paciente con esta cédula o correo electrónico"
-        );
-        return;
-      }
-      const newP: Patient = {
+      const newPatient: Patient = {
         id: `p${Date.now()}`,
         nombre,
-        cedula,
-        telefono,
+        tipoDocumento,
+        numeroDocumento,
+        telefono: telefonoNormalizado,
         email,
         fechaUltimaCompra: new Date(),
         fechaUltimoControl: new Date(),
-        fechaVencimientoFormula: new Date(
-          Date.now() + 365 * 24 * 60 * 60 * 1000
-        ),
+        fechaVencimientoFormula: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         productoComprado: "Pendiente de registro",
         asesorAsignado: user.id || "a1",
         estado: "post-venta",
@@ -304,10 +292,20 @@ export function AdvisorPatients() {
         totalCompras: 1,
         historialContactos: [],
       };
-      setPatients([...patients, newP]);
+      setPatients([...patients, newPatient]);
     }
     setSuccess(true);
     setTimeout(close, 1500);
+  };
+
+  const getTipoDocumentoLabel = (tipo: typeof tipoDocumento) => {
+    switch (tipo) {
+      case "CC": return "Cédula de Ciudadanía (CC)";
+      case "CE": return "Cédula de Extranjería (CE)";
+      case "NIT": return "NIT";
+      case "Pasaporte": return "Pasaporte";
+      default: return "Cédula de Ciudadanía (CC)";
+    }
   };
 
   return (
@@ -323,7 +321,7 @@ export function AdvisorPatients() {
 
       <Input
         contentBefore={<SearchRegular />}
-        placeholder="Buscar por nombre o teléfono..."
+        placeholder="Buscar por nombre, documento o teléfono..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         size="large"
@@ -336,16 +334,12 @@ export function AdvisorPatients() {
               {editing ? "Editar Paciente" : "Registrar Nuevo Paciente"}
             </DialogTitle>
             <DialogContent>
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: "12px" }}
-              >
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                 {success && (
                   <MessageBar intent="success">
                     <MessageBarBody>
                       <CheckmarkCircleRegular />{" "}
-                      {editing
-                        ? "¡Paciente actualizado!"
-                        : "¡Paciente registrado!"}
+                      {editing ? "¡Paciente actualizado!" : "¡Paciente registrado!"}
                     </MessageBarBody>
                   </MessageBar>
                 )}
@@ -364,28 +358,42 @@ export function AdvisorPatients() {
                   <Input
                     value={nombre}
                     onChange={(e) => setNombre(e.target.value)}
-                    placeholder="Ej: Jorge Hernández Pérez"
-                    style={{ width: "100%", marginTop: "4px" }}
+                    className={styles.fullWidth}
                   />
                 </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "12px",
-                  }}
-                >
+
+                <div className={styles.formGrid}>
                   <div>
                     <Label size="small" weight="semibold">
-                      Cédula *
+                      Tipo de Documento *
+                    </Label>
+                    <Dropdown
+                      value={getTipoDocumentoLabel(tipoDocumento)}
+                      selectedOptions={[tipoDocumento]}
+                      onOptionSelect={(_, data) => setTipoDocumento(data.optionValue as any)}
+                      className={styles.fullWidth}
+                      positioning="below"
+                    >
+                      <Option value="CC">Cédula de Ciudadanía (CC)</Option>
+                      <Option value="CE">Cédula de Extranjería (CE)</Option>
+                      <Option value="NIT">NIT</Option>
+                      <Option value="Pasaporte">Pasaporte</Option>
+                    </Dropdown>
+                  </div>
+                  <div>
+                    <Label size="small" weight="semibold">
+                      Número de Documento *
                     </Label>
                     <Input
-                      value={cedula}
-                      onChange={(e) => setCedula(e.target.value)}
-                      placeholder="1.023.456.789"
-                      style={{ width: "100%", marginTop: "4px" }}
+                      value={numeroDocumento}
+                      onChange={(e) => setNumeroDocumento(e.target.value.replace(/\D/g, ''))}
+                      placeholder="1234567890"
+                      className={styles.fullWidth}
                     />
                   </div>
+                </div>
+
+                <div className={styles.formGrid}>
                   <div>
                     <Label size="small" weight="semibold">
                       Celular *
@@ -393,22 +401,23 @@ export function AdvisorPatients() {
                     <Input
                       value={telefono}
                       onChange={(e) => setTelefono(e.target.value)}
-                      placeholder="310-555-0101"
-                      style={{ width: "100%", marginTop: "4px" }}
+                      placeholder="321 6549870"
+                      className={styles.fullWidth}
+                      onBlur={() => { if (telefono) setTelefono(formatPhoneNumber(telefono)); }}
                     />
                   </div>
-                </div>
-                <div>
-                  <Label size="small" weight="semibold">
-                    Correo *
-                  </Label>
-                  <Input
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    type="email"
-                    placeholder="email@ejemplo.com"
-                    style={{ width: "100%", marginTop: "4px" }}
-                  />
+                  <div>
+                    <Label size="small" weight="semibold">
+                      Correo *
+                    </Label>
+                    <Input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="email@ejemplo.com"
+                      className={styles.fullWidth}
+                    />
+                  </div>
                 </div>
               </div>
             </DialogContent>
@@ -482,7 +491,7 @@ export function AdvisorPatients() {
                       <div className={styles.sectionLabel}>DATOS</div>
                       <p>Tel: {p.telefono}</p>
                       <p>Email: {p.email}</p>
-                      <p>CC: {p.cedula}</p>
+                      <p>Documento: {p.tipoDocumento} {p.numeroDocumento}</p>
                       <p>Producto: {p.productoComprado}</p>
                       <p>Valor: ${p.valorUltimaCompra.toLocaleString()}</p>
                       <p>Compras: {p.totalCompras}</p>

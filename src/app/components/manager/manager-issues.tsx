@@ -80,22 +80,6 @@ const useStyles = makeStyles({
     gap: "8px",
     flexWrap: "wrap",
   },
-  filterBtn: {
-    padding: "8px 16px",
-    borderRadius: "8px",
-    fontSize: "12px",
-    fontWeight: 500,
-    cursor: "pointer",
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground2,
-    color: tokens.colorNeutralForeground2,
-    transition: "all 0.15s ease",
-  },
-  filterBtnActive: {
-    backgroundColor: tokens.colorBrandBackground,
-    color: "white",
-    borderColor: tokens.colorBrandStroke1,
-  },
   issueCard: {
     backgroundColor: tokens.colorNeutralBackground2,
     ...shorthands.border("1px", "solid", tokens.colorNeutralStroke2),
@@ -269,6 +253,15 @@ export function ManagerIssues() {
     { label: "Total", value: issues.length, color: tokens.colorBrandForeground2 },
   ];
 
+  const filterOptions = [
+    { value: "todas", label: "Todas" },
+    { value: "urgentes", label: "Urgentes" },
+    { value: "pendiente", label: "Pendientes" },
+    { value: "en-revision", label: "En Revisión" },
+    { value: "resuelta", label: "Resueltas" },
+    { value: "descartada", label: "Descartadas" },
+  ];
+
   return (
     <div className={styles.container}>
       <div className={styles.statsGrid}>
@@ -281,21 +274,15 @@ export function ManagerIssues() {
       </div>
 
       <div className={styles.filterBar}>
-        {[
-          { value: "todas", label: "Todas" },
-          { value: "urgentes", label: "Urgentes" },
-          { value: "pendiente", label: "Pendientes" },
-          { value: "en-revision", label: "En Revisión" },
-          { value: "resuelta", label: "Resueltas" },
-          { value: "descartada", label: "Descartadas" },
-        ].map((f) => (
-          <button
+        {filterOptions.map((f) => (
+          <Button
             key={f.value}
+            appearance={filter === f.value ? "primary" : "secondary"}
+            size="small"
             onClick={() => setFilter(f.value as any)}
-            className={`${styles.filterBtn} ${filter === f.value ? styles.filterBtnActive : ""}`}
           >
             {f.label}
-          </button>
+          </Button>
         ))}
       </div>
 

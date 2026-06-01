@@ -60,11 +60,10 @@ const useStyles = makeStyles({
     ...shorthands.padding("12px"),
     textAlign: "center",
   },
-  statValue: (props: { color: string }) => ({
+  statValue: {
     fontSize: "22px",
-    color: props.color,
     fontWeight: 700,
-  }),
+  },
   statLabel: {
     fontSize: "11px",
     color: tokens.colorNeutralForeground2,
@@ -82,7 +81,6 @@ const useStyles = makeStyles({
     ...shorthands.border("1px", "solid", tokens.colorStatusDangerBorder1),
     ...shorthands.borderRadius(tokens.borderRadiusLarge),
     ...shorthands.overflow("hidden"),
-    boxShadow: `0 2px 8px ${tokens.colorStatusDangerShadowAmbient}`,
   },
   taskPadding: {
     padding: "16px",
@@ -126,10 +124,9 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase100,
     color: tokens.colorNeutralForeground3,
   },
-  deadlineLabel: (props: { color: string }) => ({
-    color: props.color,
+  deadlineLabel: {
     fontWeight: 500,
-  }),
+  },
   intentIcon: {
     display: "flex",
     alignItems: "center",
@@ -184,11 +181,10 @@ const useStyles = makeStyles({
     gap: "8px",
     marginBottom: "8px",
   },
-  sectionTitle: (props: { color: string }) => ({
+  sectionTitle: {
     fontSize: tokens.fontSizeBase200,
-    color: props.color,
     fontWeight: 600,
-  }),
+  },
   taskList: {
     display: "flex",
     flexDirection: "column",
@@ -333,7 +329,9 @@ export function AdvisorQueue() {
               </div>
               <div className={styles.taskDescription}>{task.descripcion}</div>
               <div className={styles.taskMeta}>
-                <span className={styles.deadlineLabel({ color: deadline.color })}>Límite: {deadline.label}</span>
+                <span className={styles.deadlineLabel} style={{ color: deadline.color }}>
+                  Límite: {deadline.label}
+                </span>
                 {task.intentos > 0 && (
                   <span className={styles.intentIcon}>
                     <ArrowSyncRegular style={{ width: "12px", height: "12px" }} />
@@ -374,7 +372,13 @@ export function AdvisorQueue() {
                   </Button>
                 </Tooltip>
                 <Tooltip content="Cancelar tarea" relationship="label">
-                  <Button size="small" appearance="subtle" icon={<ProhibitedRegular />} onClick={() => cancelTask(task.id)} style={{ marginLeft: "auto" }}>
+                  <Button
+                    size="small"
+                    appearance="subtle"
+                    icon={<ProhibitedRegular />}
+                    onClick={() => cancelTask(task.id)}
+                    style={{ marginLeft: "auto" }}
+                  >
                     Cancelar
                   </Button>
                 </Tooltip>
@@ -444,25 +448,33 @@ export function AdvisorQueue() {
     <div className={styles.container}>
       <div className={styles.statsGrid}>
         <Card className={styles.statCard}>
-          <div className={styles.statValue({ color: tokens.colorStatusWarningForeground1 })}>{pending.length}</div>
+          <div className={styles.statValue} style={{ color: tokens.colorStatusWarningForeground1 }}>
+            {pending.length}
+          </div>
           <div className={styles.statLabel}>Pendientes</div>
         </Card>
         <Card className={styles.statCard}>
-          <div className={styles.statValue({ color: tokens.colorBrandForeground2 })}>{inProgress.length}</div>
+          <div className={styles.statValue} style={{ color: tokens.colorBrandForeground2 }}>
+            {inProgress.length}
+          </div>
           <div className={styles.statLabel}>En Progreso</div>
         </Card>
         <Card className={styles.statCard}>
-          <div className={styles.statValue({ color: tokens.colorStatusSuccessForeground1 })}>{completed.length}</div>
+          <div className={styles.statValue} style={{ color: tokens.colorStatusSuccessForeground1 }}>
+            {completed.length}
+          </div>
           <div className={styles.statLabel}>Completadas</div>
         </Card>
       </div>
 
-      {/* Atención inmediata: vencidas o urgentes */}
+      {/* Atención inmediata */}
       {sortTasks(pending).filter((t) => t.estado === "vencida" || t.prioridad === "urgente").length > 0 && (
         <div>
           <div className={styles.sectionHeader}>
             <WarningRegular style={{ width: "18px", height: "18px", color: tokens.colorStatusDangerForeground1 }} />
-            <h3 className={styles.sectionTitle({ color: tokens.colorStatusDangerForeground1 })}>Requiere Atención Inmediata</h3>
+            <h3 className={styles.sectionTitle} style={{ color: tokens.colorStatusDangerForeground1 }}>
+              Requiere Atención Inmediata
+            </h3>
           </div>
           <div className={styles.taskList}>
             {sortTasks(pending)
@@ -477,7 +489,9 @@ export function AdvisorQueue() {
         <div>
           <div className={styles.sectionHeader}>
             <ClockRegular style={{ width: "18px", height: "18px", color: tokens.colorStatusWarningForeground1 }} />
-            <h3 className={styles.sectionTitle({ color: tokens.colorNeutralForeground1 })}>Pendientes</h3>
+            <h3 className={styles.sectionTitle} style={{ color: tokens.colorNeutralForeground1 }}>
+              Pendientes
+            </h3>
           </div>
           <div className={styles.taskList}>
             {sortTasks(pending)
@@ -492,7 +506,9 @@ export function AdvisorQueue() {
         <div>
           <div className={styles.sectionHeader}>
             <PlayRegular style={{ width: "18px", height: "18px", color: tokens.colorBrandForeground2 }} />
-            <h3 className={styles.sectionTitle({ color: tokens.colorNeutralForeground1 })}>En Progreso</h3>
+            <h3 className={styles.sectionTitle} style={{ color: tokens.colorNeutralForeground1 }}>
+              En Progreso
+            </h3>
           </div>
           <div className={styles.taskList}>{inProgress.map(renderTaskCard)}</div>
         </div>
@@ -503,7 +519,9 @@ export function AdvisorQueue() {
         <div>
           <div className={styles.sectionHeader}>
             <CheckmarkCircleRegular style={{ width: "18px", height: "18px", color: tokens.colorStatusSuccessForeground1 }} />
-            <h3 className={styles.sectionTitle({ color: tokens.colorNeutralForeground1 })}>Completadas Hoy</h3>
+            <h3 className={styles.sectionTitle} style={{ color: tokens.colorNeutralForeground1 }}>
+              Completadas Hoy
+            </h3>
           </div>
           <div className={`${styles.taskList} ${styles.completedSection}`}>{completed.map(renderTaskCard)}</div>
         </div>
